@@ -1,0 +1,86 @@
+pipeline {
+agent any
+stages {
+stage("Git Checkout") {
+steps { script {
+git url: 'https://jenisakthi@bitbucket.org/jenisakthi/samplepythonjeni.git', credentialsId: 'bitbucket-creds', branch: 'master' } }
+}
+stage("create new war file") {
+steps {
+sh "jar -cvf sample.war index.html"
+}
+}
+stage("tomcat deployment remove existing directory"){
+steps{
+sshagent(credentials: ['tomcat-server']) {
+sh """
+sshpass -p 'centos' ssh -o StrictHostKeyChecking=no root@192.168.0.6 -t 'rm -rf /home/centos/deployment_backup'
+"""
+}
+}
+}
+stage("make new directory"){
+steps{
+sshagent(credentials: ['tomcat-server']) {
+sh """
+sshpass -p 'centos' ssh -o StrictHostKeyChecking=no root@192.168.0.6 -t 'mkdir /home/centos/deployment_backup'
+"""
+}
+}
+}
+stage("stop tomcat"){
+steps{
+sshagent(credentials: ['tomcat-server']) {
+sh """
+sshpass -p 'centos' ssh -o StrictHostKeyChecking=no root@192.168.0.6 -t 'systemctl stop tomcat'
+"""
+}
+}
+}
+stage("backup sample.war"){
+steps{
+sshagent(credentials: ['tomcat-server']) {
+sh """
+sshpass -p 'centos' ssh -o StrictHostKeyChecking=no root@192.168.0.6 -t 'mv /opt/tomcat/apache-tomcat-9.0.54/webapps/sample.war /home/centos/deployment_backup/'
+"""
+}
+}
+}
+stage("move samplewar to tomcat-server"){
+steps{
+sshagent(credentials: ['tomcat-server']) {
+sh """
+sshpass -p 'centos' scp sample.war root@192.168.0.6:/opt/tomcat/apache-tomcat-9.0.54/webapps/
+"""
+}
+}
+}
+stage("tomcat daemon-reload"){
+steps{
+sshagent(credentials: ['tomcat-server']) {
+sh """
+sshpass -p 'centos' ssh -o StrictHostKeyChecking=no root@192.168.0.6 -t 'systemctl daemon-reload'
+"""
+}
+}
+}
+stage("tomcat restart"){
+steps{
+sshagent(credentials: ['tomcat-server']) {
+sh """
+sshpass -p 'centos' ssh -o StrictHostKeyChecking=no root@192.168.0.6 -t 'systemctl restart tomcat'
+"""
+}
+}
+}
+stage("tomcat status"){
+steps{
+sshagent(credentials: ['tomcat-server']) {
+sh """
+sshpass -p 'centos' ssh -o StrictHostKeyChecking=no root@192.168.0.6 -t 'systemctl status tomcat'
+"""
+}
+}
+}
+}
+}
